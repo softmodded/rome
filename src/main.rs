@@ -455,8 +455,8 @@ fn cmd_codec(port: Option<&str>) -> Result<()> {
     let read_us = u32::from_le_bytes([d[27], d[28], d[29], d[30]]);
     println!("    audio cur_block  = {} (relative; loud audio starts ~block 26)", cur_block);
     println!("    eMMC read/block  = {} µs (budget 2670 µs/block for realtime)", read_us);
-    let ain0 = u16::from_le_bytes([d[29], d[30]]);
-    println!("    AIN0 ladder raw  = {} (play+track buttons; press one to see value)", ain0);
+    let ain1 = u16::from_le_bytes([d[29], d[30]]);
+    println!("    AIN1 ladder raw  = {} (vol+/vol-/fwd/rwd; hold one while running)", ain1);
     let ul_block = u32::from_le_bytes([d[23], d[24], d[25], d[26]]);
     let ul_fail = d[28];
     let fail_str = match ul_fail { 0 => "none", 1 => "USB-READ-TIMEOUT", 2 => "WRITE-FAIL", _ => "?" };
