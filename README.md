@@ -1,15 +1,15 @@
 # rome
 
-cli companion for [marisko](https://github.com/softmodded/marisko) — custom firmware for the teenage engineering sp-1 stem player.
+cli companion for [marisko](https://github.com/softmodded/marisko) - custom firmware for the teenage engineering sp-01 stem player.
 
-flashes firmware over the bootloader and manages stems (songs) on the device's eMMC over USB.
+flashes firmware over the bootloader and manages stems (songs) on the device's storage over usb.
 
 ## features
 
-- **firmware flash** — write a `.bin` to the device via the sp-1 bootloader (UART, COBS framing)
-- **stem upload** — encode 4 stereo stems (FLAC/WAV/MP3/OGG, any rate) to 8-channel IMA-ADPCM and upload at ~390 KB/s
+- **firmware flash** — write a `.bin` to the device via the sp-1 bootloader (uart)
+- **stem upload** — encode 4 stereo stems (any format, any rate) to 8-channel ima adpcm and upload at ~390 KB/s
 - **disk management** — list / add / remove songs, format, read disk info
-- **diagnostics** — codec bring-up, EXT_CSD dump, block read/decode, write probe
+- **diagnostics** — codec bring-up, ext_csd dump, block read/decode, write probe
 
 ## usage
 
@@ -32,7 +32,7 @@ rome codec
 
 ## permissions
 
-stem management talks raw USB bulk (libusb) to the running firmware — bypasses the
+stem management talks raw usb bulk (libusb) to the running firmware so i nee dto bypass the
 kernel cdc-acm tty for full throughput. install a udev rule so it works without sudo:
 
 ```
@@ -41,7 +41,7 @@ echo 'SUBSYSTEM=="usb", ATTRS{idVendor}=="2fe3", ATTRS{idProduct}=="0101", MODE=
 sudo udevadm control --reload-rules && sudo udevadm trigger
 ```
 
-(firmware flashing uses the bootloader's serial path and never needs sudo.)
+(firmware flashing uses the bootloaders serial and doesnt need sudo)
 
 ## build
 
