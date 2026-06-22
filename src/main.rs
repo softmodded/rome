@@ -63,6 +63,15 @@ enum Cmd {
         port: Option<String>,
     },
 
+    /// Feed-thread health (underrun recoveries, eMMC read times). Poll while playing.
+    Audio {
+        #[arg(short, long)]
+        port: Option<String>,
+        /// Sample N times, 1s apart, to watch counters climb
+        #[arg(short, long, default_value_t = 1)]
+        count: u32,
+    },
+
     /// Dump a raw 512-byte eMMC block (diagnostics)
     Dump {
         #[arg(short, long)]
@@ -367,6 +376,14 @@ fn cmd_song_add(
         blocks.len(), (secs / 60.0).floor(), secs % 60.0,
         blocks.len() as f64 * 512.0 / 1_048_576.0);
 
+    // Bake decimated VU levels, appended after audio in the upload stream.
+    let levels = adpcm::bake_levels(&blocks);
+    let level_blocks = adpcm::pack_levels(&levels);
+    eprintln!("rome: baked {} VU levels → {} level blocks", levels.len(), level_blocks.len());
+    let mut stream: Vec<[u8; 512]> = Vec::with_capacity(blocks.len() + level_blocks.len());
+    stream.extend_from_slice(&blocks);
+    stream.extend_from_slice(&level_blocks);
+
     let mut dev = open_dev(port)?;
     dev.ping().context("ping failed")?;
 
@@ -375,12 +392,12 @@ fn cmd_song_add(
     name_bytes[..nb.len().min(23)].copy_from_slice(&nb[..nb.len().min(23)]);
 
     eprintln!("rome: uploading \"{}\" ({} blocks)...", name, blocks.len());
-    let song_idx = dev.song_begin(&name_bytes, blocks.len() as u32)?;
+    let song_idx = dev.song_begin(&name_bytes, blocks.len() as u32, level_blocks.len() as u32)?;
 
     const BATCH: usize = 96;
-    let pb = progress_bar(blocks.len() as u64);
+    let pb = progress_bar(stream.len() as u64);
     let mut sent = 0usize;
-    for chunk in blocks.chunks(BATCH) {
+    for chunk in stream.chunks(BATCH) {
         if let Err(e) = dev.song_multiblock(chunk) {
             pb.finish_and_clear();
             eprintln!("rome: FAILED after {} blocks ok; failing batch = blocks [{}..{}]",
@@ -466,6 +483,23 @@ fn cmd_codec(port: Option<&str>) -> Result<()> {
     Ok(())
 }
 
+fn cmd_audio(port: Option<&str>, count: u32) -> Result<()> {
+    let mut dev = open_dev(port)?;
+    dev.ping().context("ping failed")?;
+    println!("{:>10} {:>11} {:>11} {:>11} {:>10} {:>10} {:>10}",
+        "recover", "write_fail", "max_rd_us", "last_rd_us", "cur_blk", "blks_fed", "crc_err");
+    for i in 0..count.max(1) {
+        let d = dev.audio_diag()?;
+        println!("{:>10} {:>11} {:>11} {:>11} {:>10} {:>10} {:>10}",
+            d[0], d[1], d[2], d[3], d[4], d[5], d[6]);
+        if i + 1 < count {
+            std::thread::sleep(std::time::Duration::from_secs(1));
+        }
+    }
+    println!("\nbudget: max_rd_us must stay < 2670 for realtime. recover/write_fail > 0 = TX underran.");
+    Ok(())
+}
+
 fn cmd_extcsd(port: Option<&str>) -> Result<()> {
     let mut dev = open_dev(port)?;
     dev.ping().context("ping failed")?;
@@ -519,6 +553,7 @@ fn main() -> Result<()> {
         },
         Cmd::Extcsd { port }       => cmd_extcsd(port.as_deref()),
         Cmd::Codec  { port }       => cmd_codec(port.as_deref()),
+        Cmd::Audio  { port, count } => cmd_audio(port.as_deref(), count),
         Cmd::Dump   { port, block } => cmd_dump(port.as_deref(), block),
         Cmd::Decode { port, start, count } => cmd_decode(port.as_deref(), start, count),
         Cmd::Probe  { port, blocks } => cmd_probe(port.as_deref(), &blocks),

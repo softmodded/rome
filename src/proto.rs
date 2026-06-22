@@ -18,6 +18,7 @@ pub const CMD_CODEC_DIAG: u8      = 0x0B;
 pub const CMD_READ_BLOCK: u8      = 0x0C;
 pub const CMD_WRITE_PROBE: u8     = 0x0D;
 pub const CMD_WRITE_STRESS: u8    = 0x0E;
+pub const CMD_AUDIO_DIAG: u8      = 0x0F;
 
 const STATUS_OK: u8  = 0x00;
 const STATUS_ERR: u8 = 0xFF;
@@ -230,6 +231,20 @@ impl DeviceConn {
         Ok(u32::from_le_bytes([data[0], data[1], data[2], data[3]]))
     }
 
+    /// Feed-thread health: [recoveries, write_fails, max_read_us, last_read_us,
+    /// cur_block, blocks_fed, crc_errors].
+    pub fn audio_diag(&mut self) -> Result<[u32; 7]> {
+        let data = self.cmd(CMD_AUDIO_DIAG, &[])?;
+        if data.len() < 28 {
+            bail!("audio_diag: short response ({} bytes)", data.len());
+        }
+        let mut out = [0u32; 7];
+        for (i, v) in out.iter_mut().enumerate() {
+            *v = u32::from_le_bytes(data[i * 4..i * 4 + 4].try_into().unwrap());
+        }
+        Ok(out)
+    }
+
     pub fn codec_diag(&mut self) -> Result<[u8; 32]> {
         let data = self.cmd(CMD_CODEC_DIAG, &[])?;
         if data.len() < 32 {
@@ -240,11 +255,14 @@ impl DeviceConn {
         Ok(buf)
     }
 
-    /// Begin uploading a song. Returns catalog index.
-    pub fn song_begin(&mut self, name: &[u8; 24], nblocks: u32) -> Result<u16> {
-        let mut payload = [0u8; 28];
+    /// Begin uploading a song. `audio_blocks` = audio block count (recorded in
+    /// the catalog); `lvl_blocks` = baked VU-level blocks that follow the audio
+    /// in the upload stream. Returns catalog index.
+    pub fn song_begin(&mut self, name: &[u8; 24], audio_blocks: u32, lvl_blocks: u32) -> Result<u16> {
+        let mut payload = [0u8; 32];
         payload[0..24].copy_from_slice(name);
-        payload[24..28].copy_from_slice(&nblocks.to_le_bytes());
+        payload[24..28].copy_from_slice(&audio_blocks.to_le_bytes());
+        payload[28..32].copy_from_slice(&lvl_blocks.to_le_bytes());
         let resp = self.cmd(CMD_SONG_BEGIN, &payload)?;
         if resp.len() < 2 {
             bail!("song_begin: short response");

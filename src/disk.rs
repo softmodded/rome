@@ -1,7 +1,7 @@
 /// Rust mirror of app/src/disk.h — SP1F eMMC disk format.
 
 pub const DISK_MAGIC: u32 = 0x5350_3146; // "SP1F"
-pub const DISK_VERSION: u8 = 1;
+pub const DISK_VERSION: u8 = 2; // v2: per-block baked VU levels appended after audio
 pub const DISK_CATALOG_BLOCKS: usize = 8;
 pub const DISK_SONGS_PER_BLOCK: usize = 16;
 pub const DISK_MAX_SONGS: usize = DISK_CATALOG_BLOCKS * DISK_SONGS_PER_BLOCK; // 128
