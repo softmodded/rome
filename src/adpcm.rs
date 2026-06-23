@@ -113,11 +113,13 @@ pub fn encode_8ch(channel_pcm: &[Vec<i16>; CHANNELS]) -> Vec<[u8; BLOCK_SIZE]> {
 /// Audio blocks per baked VU-level byte. MUST match firmware `LVL_DECIM`.
 pub const LVL_DECIM: usize = 16;
 
-/// Bake one VU-level byte per `LVL_DECIM` audio blocks. Decodes all 8 channels
-/// (4 stereo stems) and sums them — UN-clipped — so the meter reflects the
-/// combined energy of every stem, not just the loudest. Peak of |sumL|,|sumR|
-/// over the group, quantized >> 9 → 0..255 (4 full stems ≈ 255, single ≈ 63).
-pub fn bake_levels(blocks: &[[u8; BLOCK_SIZE]]) -> Vec<u8> {
+/// Bake four VU-level bytes (one per stem) per `LVL_DECIM` audio blocks, stored
+/// interleaved [s0,s1,s2,s3, s0,s1,s2,s3, …]. Each stem's byte is the peak of
+/// |L|,|R| for that stem alone over the group, quantized >> 7 → 0..255 (a single
+/// stem at full scale ≈ 255). The firmware dims each track LED to its stem's
+/// level and derives the overall pb-LED meter by summing the four (scaled by the
+/// live fader gains). Disk v3.
+pub fn bake_stem_levels(blocks: &[[u8; BLOCK_SIZE]]) -> Vec<u8> {
     let mut pred = [0i32; CHANNELS];
     let mut sidx = [0i32; CHANNELS];
 
@@ -133,26 +135,25 @@ pub fn bake_levels(blocks: &[[u8; BLOCK_SIZE]]) -> Vec<u8> {
         *p
     };
 
-    let mut levels = Vec::with_capacity(blocks.len().div_ceil(LVL_DECIM));
-    let mut group_peak = 0i32;
+    let mut levels = Vec::with_capacity(blocks.len().div_ceil(LVL_DECIM) * 4);
+    let mut stem_peak = [0i32; 4];
     for (bi, b) in blocks.iter().enumerate() {
         for i in 0..SAMPLES_PER_BLOCK {
-            // Sum all 4 stems (8 channels) without clipping so each contributes.
-            let (mut l, mut r) = (0i32, 0i32);
             for stem in 0..4 {
                 let bl = b[stem * 128 + i / 2];
                 let br = b[stem * 128 + 64 + i / 2];
                 let nl = if i & 1 == 1 { bl >> 4 } else { bl & 0xF };
                 let nr = if i & 1 == 1 { br >> 4 } else { br & 0xF };
-                l += step(&mut sidx[stem * 2],     &mut pred[stem * 2],     nl);
-                r += step(&mut sidx[stem * 2 + 1], &mut pred[stem * 2 + 1], nr);
+                let l = step(&mut sidx[stem * 2],     &mut pred[stem * 2],     nl);
+                let r = step(&mut sidx[stem * 2 + 1], &mut pred[stem * 2 + 1], nr);
+                stem_peak[stem] = stem_peak[stem].max(l.abs()).max(r.abs());
             }
-            group_peak = group_peak.max(l.abs()).max(r.abs());
         }
         if bi % LVL_DECIM == LVL_DECIM - 1 || bi == blocks.len() - 1 {
-            // >> 9: 4 stems at full scale (~131068) → 255, single stem → ~63.
-            levels.push((group_peak >> 9).min(255) as u8);
-            group_peak = 0;
+            for stem in 0..4 {
+                levels.push((stem_peak[stem] >> 7).min(255) as u8);
+                stem_peak[stem] = 0;
+            }
         }
     }
     levels

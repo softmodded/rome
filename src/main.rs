@@ -376,10 +376,10 @@ fn cmd_song_add(
         blocks.len(), (secs / 60.0).floor(), secs % 60.0,
         blocks.len() as f64 * 512.0 / 1_048_576.0);
 
-    // Bake decimated VU levels, appended after audio in the upload stream.
-    let levels = adpcm::bake_levels(&blocks);
+    // Bake decimated per-stem VU levels (4 bytes/decim), appended after audio.
+    let levels = adpcm::bake_stem_levels(&blocks);
     let level_blocks = adpcm::pack_levels(&levels);
-    eprintln!("rome: baked {} VU levels → {} level blocks", levels.len(), level_blocks.len());
+    eprintln!("rome: baked {} per-stem VU bytes → {} level blocks", levels.len(), level_blocks.len());
     let mut stream: Vec<[u8; 512]> = Vec::with_capacity(blocks.len() + level_blocks.len());
     stream.extend_from_slice(&blocks);
     stream.extend_from_slice(&level_blocks);
