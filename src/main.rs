@@ -468,6 +468,9 @@ fn cmd_codec(port: Option<&str>) -> Result<()> {
     println!("    TAS P0/R64 dacv  = 0x{:02X}", d[18]);
     println!("    TAS P0/R65 lvol  = 0x{:02X}", d[19]);
     println!("    TAS P0/R25 clk   = 0x{:02X}", d[20]);
+    println!("    CS osc-switch    = 0x{:02X}  ({})", d[23],
+             if d[23] == 0x02 { "SCLK→MCLK OK" } else { "NOT switched (DAC on RCO → clicks)" });
+    println!("    CS HP_CTL now    = 0x{:02X}  (0x01=unmuted 0x0D=muted)", d[24]);
     let cur_block = u32::from_le_bytes([d[23], d[24], d[25], d[26]]);
     let read_us = u32::from_le_bytes([d[27], d[28], d[29], d[30]]);
     println!("    audio cur_block  = {} (relative; loud audio starts ~block 26)", cur_block);
