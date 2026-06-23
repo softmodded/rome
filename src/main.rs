@@ -489,12 +489,12 @@ fn cmd_codec(port: Option<&str>) -> Result<()> {
 fn cmd_audio(port: Option<&str>, count: u32) -> Result<()> {
     let mut dev = open_dev(port)?;
     dev.ping().context("ping failed")?;
-    println!("{:>10} {:>11} {:>11} {:>11} {:>10} {:>10} {:>10}",
-        "recover", "write_fail", "max_rd_us", "last_rd_us", "cur_blk", "blks_fed", "crc_err");
+    println!("{:>10} {:>11} {:>11} {:>11} {:>10} {:>10} {:>10} {:>8}",
+        "recover", "write_fail", "max_rd_us", "last_rd_us", "cur_blk", "blks_fed", "crc_err", "ain0");
     for i in 0..count.max(1) {
         let d = dev.audio_diag()?;
-        println!("{:>10} {:>11} {:>11} {:>11} {:>10} {:>10} {:>10}",
-            d[0], d[1], d[2], d[3], d[4], d[5], d[6]);
+        println!("{:>10} {:>11} {:>11} {:>11} {:>10} {:>10} {:>10} {:>8}",
+            d[0], d[1], d[2], d[3], d[4], d[5], d[6], d[7]);
         if i + 1 < count {
             std::thread::sleep(std::time::Duration::from_secs(1));
         }

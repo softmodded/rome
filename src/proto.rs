@@ -233,12 +233,12 @@ impl DeviceConn {
 
     /// Feed-thread health: [recoveries, write_fails, max_read_us, last_read_us,
     /// cur_block, blocks_fed, crc_errors].
-    pub fn audio_diag(&mut self) -> Result<[u32; 7]> {
+    pub fn audio_diag(&mut self) -> Result<[u32; 8]> {
         let data = self.cmd(CMD_AUDIO_DIAG, &[])?;
-        if data.len() < 28 {
+        if data.len() < 32 {
             bail!("audio_diag: short response ({} bytes)", data.len());
         }
-        let mut out = [0u32; 7];
+        let mut out = [0u32; 8];
         for (i, v) in out.iter_mut().enumerate() {
             *v = u32::from_le_bytes(data[i * 4..i * 4 + 4].try_into().unwrap());
         }
